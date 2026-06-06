@@ -1,11 +1,11 @@
 # Alpine image
 FROM alpine:latest AS alpine
-LABEL maintainer="Vidar Holen <vidar@vidarholen.net>"
+LABEL maintainer="Conner Crosby <cavcrosby@gmail.com>"
 ARG tag
 
 # Put the right binary for each architecture into place for the
 # multi-architecture docker image.
-ARG url_base="https://github.com/koalaman/shellcheck/releases/download/"
+ARG url_base="https://github.com/cavcrosby/shellcheck/releases/download/"
 RUN set -x; \
   arch="$(uname -m)"; \
   echo "arch is $arch"; \
@@ -18,7 +18,7 @@ RUN set -x; \
 
 # ShellCheck image
 FROM scratch
-LABEL maintainer="Vidar Holen <vidar@vidarholen.net>"
+LABEL maintainer="Conner Crosby <cavcrosby@gmail.com>"
 WORKDIR /mnt
 COPY --from=alpine /bin/shellcheck /bin/
 ENTRYPOINT ["/bin/shellcheck"]

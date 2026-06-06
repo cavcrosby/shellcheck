@@ -289,6 +289,13 @@ optionalTreeChecks = [
         cdPositive = "cat foo | grep bar",
         cdNegative = "grep bar foo"
     }, nodeChecksToTreeCheck [checkUuoc])
+
+    ,(newCheckDescription {
+        cdName = "prefer-double-quotes",
+        cdDescription = "Suggest double quotes for literals where quoting semantics are unchanged",
+        cdPositive = "echo 'hello'",
+        cdNegative = "echo \"hello\""
+    }, nodeChecksToTreeCheck [checkPreferDoubleQuotes])
     ]
 
 optionalCheckMap :: Map.Map String (Parameters -> Token -> [TokenComment])
@@ -1166,6 +1173,67 @@ checkSingleQuotedVariables params t@(T_SingleQuoted id s) =
     getMumpsCommand _ = "mumps"
 checkSingleQuotedVariables _ _ = return ()
 
+prop_checkPreferDoubleQuotes1 = verifyCodes checkPreferDoubleQuotes [4000] "echo 'hello'"
+prop_checkPreferDoubleQuotes2 = verify checkPreferDoubleQuotes "echo 'hello'"
+prop_checkPreferDoubleQuotes3 = verify checkPreferDoubleQuotes "echo 'hello@#%^&*(){}foo'"
+prop_checkPreferDoubleQuotes4 = verify checkPreferDoubleQuotes "echo '.foo'"
+prop_checkPreferDoubleQuotes5 = verify checkPreferDoubleQuotes "echo -e '\\n'"
+prop_checkPreferDoubleQuotes6 = verify checkPreferDoubleQuotes "echo -e '\\@'"
+prop_checkPreferDoubleQuotes7 = verify checkPreferDoubleQuotes "set -o histexpand; echo -e '!='"
+prop_checkPreferDoubleQuotes8 = verify checkPreferDoubleQuotes "set -o histexpand; echo -e 'foo! bang!'"
+prop_checkPreferDoubleQuotes9 = verifyNot checkPreferDoubleQuotes "echo \"hello\""
+prop_checkPreferDoubleQuotes10 = verifyNot checkPreferDoubleQuotes "echo '$(echo foo)'"
+prop_checkPreferDoubleQuotes11 = verifyNot checkPreferDoubleQuotes "echo '`echo foo`'"
+prop_checkPreferDoubleQuotes12 = verifyNot checkPreferDoubleQuotes "echo '`!123`'"
+prop_checkPreferDoubleQuotes13 = verifyNot checkPreferDoubleQuotes "jq '.foo' file.json"
+prop_checkPreferDoubleQuotes14 = verifyNot checkPreferDoubleQuotes "yq '.foo' file.yml"
+prop_checkPreferDoubleQuotes15 = verifyNot checkPreferDoubleQuotes "echo 'foo\\$bar'"
+prop_checkPreferDoubleQuotes16 = verifyNot checkPreferDoubleQuotes "echo 'foo\\`bar'"
+prop_checkPreferDoubleQuotes17 = verifyNot checkPreferDoubleQuotes "echo 'foo\\\"bar'"
+prop_checkPreferDoubleQuotes18 = verifyNot checkPreferDoubleQuotes "echo 'foo\\\\bar'"
+prop_checkPreferDoubleQuotes19 = verifyNot checkPreferDoubleQuotes "echo 'foo\\'"
+prop_checkPreferDoubleQuotes20 = verifyNot checkPreferDoubleQuotes "set -o histexpand; echo -e '!1234'"
+prop_checkPreferDoubleQuotes21 = verifyNot checkPreferDoubleQuotes "set -o histexpand; echo -e 'foo!=bar!123'"
+
+checkPreferDoubleQuotes params t@(T_SingleQuoted id s) =
+    unless (isJqLikeCommand params t) $
+        when (safeSingleQuotedForDoubleQuotes params s) $
+            style id 4000
+                "This single-quoted string can be double quoted without changing shell behavior."
+checkPreferDoubleQuotes _ _ = return ()
+
+isJqLikeCommand :: Parameters -> Token -> Bool
+isJqLikeCommand params token =
+    case getClosestCommand (parentMap params) token >>= getCommandBasename of
+        Just name -> name `elem` ["jq", "yq"]
+        Nothing -> False
+
+safeSingleQuotedForDoubleQuotes :: Parameters -> String -> Bool
+safeSingleQuotedForDoubleQuotes params s =
+    not (null s)
+    && not (any (`elem` s) "`$")
+    && not (containsSpecialDoubleQuoteBackslash s)
+    && not (hasHistoryExpansion params && containsUnsafeHistoryExpansionBang s)
+
+containsSpecialDoubleQuoteBackslash :: String -> Bool
+containsSpecialDoubleQuoteBackslash [] =
+    False
+containsSpecialDoubleQuoteBackslash ['\\'] =
+    True
+containsSpecialDoubleQuoteBackslash ('\\':c:rest) =
+    c `elem` "$`\"\\\n" || containsSpecialDoubleQuoteBackslash rest
+containsSpecialDoubleQuoteBackslash (_:rest) =
+    containsSpecialDoubleQuoteBackslash rest
+
+containsUnsafeHistoryExpansionBang :: String -> Bool
+containsUnsafeHistoryExpansionBang [] =
+    False
+containsUnsafeHistoryExpansionBang ['!'] =
+    False
+containsUnsafeHistoryExpansionBang ('!':c:rest) =
+    c `notElem` "= \t\n\r" || containsUnsafeHistoryExpansionBang rest
+containsUnsafeHistoryExpansionBang (_:rest) =
+    containsUnsafeHistoryExpansionBang rest
 
 prop_checkUnquotedN = verify checkUnquotedN "if [ -n $foo ]; then echo cow; fi"
 prop_checkUnquotedN2 = verify checkUnquotedN "[ -n $cow ]"

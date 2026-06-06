@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/koalaman/shellcheck/actions/workflows/build.yml/badge.svg)](https://github.com/koalaman/shellcheck/actions/workflows/build.yml)
+[![Build Status](https://github.com/cavcrosby/shellcheck/actions/workflows/build.yml/badge.svg)](https://github.com/cavcrosby/shellcheck/actions/workflows/build.yml)
 
 
 # ShellCheck - A shell script static analysis tool
@@ -237,15 +237,15 @@ flox install shellcheck
 
 Alternatively, you can download pre-compiled binaries for the latest release here:
 
-* [Linux, x86_64](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz) (statically linked)
-* [Linux, armv6hf](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.armv6hf.tar.xz), i.e. Raspberry Pi (statically linked)
-* [Linux, aarch64](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.aarch64.tar.xz) aka ARM64 (statically linked)
-* [macOS, aarch64](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.darwin.aarch64.tar.xz)
-* [macOS, x86_64](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.darwin.x86_64.tar.xz)
-* [Windows, x86](https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.zip)
+* [Linux, x86_64](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz) (statically linked)
+* [Linux, armv6hf](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.linux.armv6hf.tar.xz), i.e. Raspberry Pi (statically linked)
+* [Linux, aarch64](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.linux.aarch64.tar.xz) aka ARM64 (statically linked)
+* [macOS, aarch64](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.darwin.aarch64.tar.xz)
+* [macOS, x86_64](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.darwin.x86_64.tar.xz)
+* [Windows, x86](https://github.com/cavcrosby/shellcheck/releases/download/stable/shellcheck-stable.zip)
 
-or see the [GitHub Releases](https://github.com/koalaman/shellcheck/releases) for other releases
-(including the [latest](https://github.com/koalaman/shellcheck/releases/tag/latest) meta-release for daily git builds).
+or see the [GitHub Releases](https://github.com/cavcrosby/shellcheck/releases) for other releases
+(including the [latest](https://github.com/cavcrosby/shellcheck/releases/tag/latest) meta-release for daily git builds).
 
 There are currently no official binaries for Apple Silicon, but third party builds are available via
 [ShellCheck for Visual Studio Code](https://github.com/vscode-shellcheck/shellcheck-binaries/releases).
@@ -263,7 +263,7 @@ To run ShellCheck via [pre-commit](https://pre-commit.com/), add the hook to you
 
 ```
 repos:
--   repo: https://github.com/koalaman/shellcheck-precommit
+-   repo: https://github.com/cavcrosby/shellcheck-precommit
     rev: v0.11.0
     hooks:
     -   id: shellcheck
@@ -288,7 +288,7 @@ A simple installer may do something like:
 
 ```bash
 scversion="stable" # or "v0.4.7", or "latest"
-wget -qO- "https://github.com/koalaman/shellcheck/releases/download/${scversion?}/shellcheck-${scversion?}.linux.x86_64.tar.xz" | tar -xJv
+wget -qO- "https://github.com/cavcrosby/shellcheck/releases/download/${scversion?}/shellcheck-${scversion?}.linux.x86_64.tar.xz" | tar -xJv
 cp "shellcheck-${scversion}/shellcheck" /usr/bin/
 shellcheck --version
 ```

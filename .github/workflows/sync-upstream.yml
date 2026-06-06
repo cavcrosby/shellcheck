@@ -1,0 +1,25 @@
+name: Sync with the upstream repository
+
+on:
+  schedule:
+    - cron: "0 5 * * 6"
+  workflow_dispatch: {}
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      - name: Sync the upstream's repository contents
+        run: |
+          git remote add --fetch "upstream" "https://github.com/koalaman/shellcheck.git"
+          git config "user.name" "github-actions[bot]"
+          git config "user.email" "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge "upstream/master"
+          git push "origin" "master"

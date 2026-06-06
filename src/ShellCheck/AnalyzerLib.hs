@@ -91,6 +91,8 @@ data Parameters = Parameters {
     hasPipefail        :: Bool,
     -- Whether this script has 'shopt -s execfail' anywhere.
     hasExecfail        :: Bool,
+    -- Whether this script has 'set -o histexpand' anywhere.
+    hasHistoryExpansion :: Bool,
     -- A linear (bad) analysis of data flow
     variableFlow       :: [StackData],
     -- A map from Id to Token
@@ -231,6 +233,10 @@ makeParameters spec = params
         hasExecfail =
             case shellType params of
                 Bash -> isOptionSet "execfail" root
+                _ -> False,
+        hasHistoryExpansion =
+            case shellType params of
+                Bash -> isOptionSet "histexpand" root
                 _ -> False,
         shellTypeSpecified = isJust (asShellType spec) || isJust (asFallbackShell spec),
         idMap = getTokenMap root,
