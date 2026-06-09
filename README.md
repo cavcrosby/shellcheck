@@ -264,7 +264,7 @@ To run ShellCheck via [pre-commit](https://pre-commit.com/), add the hook to you
 ```
 repos:
 -   repo: https://github.com/cavcrosby/shellcheck-precommit
-    rev: v0.11.0
+    rev: v0.12.0
     hooks:
     -   id: shellcheck
 #       args: ["--severity=warning"]  # Optionally only show errors and warnings

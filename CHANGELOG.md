@@ -6,6 +6,13 @@
 ### Fixed
 
 ### Removed
+
+
+## v0.12.0 - 2025-06-07
+### Added
+- SC4000: Suggest double quotes for literals where quoting semantics are unchanged
+
+### Removed
 - SC3003: removed since ANSI C string is specified in POSIX.1-2024
 
 
