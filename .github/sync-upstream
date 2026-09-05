@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Syncs a remote Git repository with its upstream repository counterpart.
+
+set -eo pipefail
+
+# constants
+PROGNAME="$(basename "$0")"
+readonly PROGNAME
+
+is_ge_version() {
+    local version1="$1"
+    local version2="$2"
+
+    # uniq handles equal versions
+    ! printf \
+        "%s\n%s\n" \
+        "${version1}" \
+        "${version2}" \
+        | sort --version-sort \
+        | uniq --unique \
+        | head --lines 1 \
+        | grep --quiet "${version1}"
+}
+
+if ! [ "${GITHUB_ACTIONS}" ]; then
+    printf \
+        "%s: %s\n" \
+        "${PROGNAME}" \
+        "must run in a GitHub Actions's workflow" \
+        >&2
+
+    exit 1
+fi
+
+latest_origin_version="$(\
+    gh api \
+        --paginate \
+        "repos/cavcrosby/shellcheck/tags" \
+        | yq '[.[]] | flatten | .[].name' \
+        | sort --version-sort \
+        | tail --lines 1 \
+)"
+
+latest_upstream_version="$(\
+    gh api \
+        --paginate \
+        "repos/koalaman/shellcheck/tags" \
+        | yq '[.[]] | flatten | .[].name' \
+        | sort --version-sort \
+        | tail --lines 1 \
+)"
+
+if is_ge_version "${latest_upstream_version}" "${latest_origin_version}"; then
+    git remote add \
+        --no-tags \
+        --fetch \
+        "upstream" \
+        "https://github.com/koalaman/shellcheck.git"
+
+    git config set "user.name" "github-actions[bot]"
+    git config set \
+        "user.email" \
+        "41898282+github-actions[bot]@users.noreply.github.com"
+
+    git merge \
+        --message "Merge upstream tag '${tag}'" \
+        "$(git ls-remote "upstream" "${tag}^{}" | awk '{ print $1 }')"
+
+    git push "origin" "master"
+fi
+
+exit 0
