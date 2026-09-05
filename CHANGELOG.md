@@ -8,6 +8,11 @@
 ### Removed
 
 
+## v0.13.0 - 2026-09-05
+### Added
+- SC4001: Suggest removing unnecessary escapes in parameter expansion patterns.
+
+
 ## v0.12.0 - 2026-06-07
 ### Added
 - SC4000: Suggest double quotes for literals where quoting semantics are unchanged
