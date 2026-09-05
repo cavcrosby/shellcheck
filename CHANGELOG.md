@@ -8,7 +8,7 @@
 ### Removed
 
 
-## v0.12.0 - 2025-06-07
+## v0.12.0 - 2026-06-07
 ### Added
 - SC4000: Suggest double quotes for literals where quoting semantics are unchanged
 
