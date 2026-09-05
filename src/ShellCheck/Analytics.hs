@@ -198,6 +198,7 @@ nodeChecks = [
     ,checkComparisonWithLeadingX
     ,checkCommandWithTrailingSymbol
     ,checkUnquotedParameterExpansionPattern
+    ,checkUnnecessaryParameterExpansionPatternEscape
     ,checkBatsTestDoesNotUseNegation
     ,checkCommandIsUnreachable
     ,checkSpacefulnessCfg
@@ -430,6 +431,26 @@ replaceToken id params r =
         repPrecedence = depth,
         repInsertionPoint = InsertBefore
     }
+replaceWithinToken id params offset n r =
+    let tp = tokenPositions params
+        (start, _) = tp Map.! id
+        replacementStart = advancePosition start offset
+        replacementEnd = advancePosition replacementStart n
+        depth = length $ getPath (parentMap params) (T_EOF id)
+    in
+    newReplacement {
+        repStartPos = replacementStart,
+        repEndPos = replacementEnd,
+        repString = r,
+        repPrecedence = depth,
+        repInsertionPoint = InsertBefore
+    }
+  where
+    advancePosition pos [] = pos
+    advancePosition pos ('\n':rest) =
+        advancePosition pos { posLine = posLine pos + 1, posColumn = 1 } rest
+    advancePosition pos (_:rest) =
+        advancePosition pos { posColumn = posColumn pos + 1 } rest
 
 surroundWith id params s = fixWith [replaceStart id params 0 s, replaceEnd id params 0 s]
 fixWith fixes = newFix { fixReplacements = fixes }
@@ -4820,6 +4841,184 @@ checkUnquotedParameterExpansionPattern params x =
             "Expansions inside ${..} need to be quoted separately, otherwise they match as patterns." $
                 surroundWith (getId t) params "\""
 
+prop_checkUnnecessaryParameterExpansionPatternEscape1 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var#foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape2 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var##foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape3 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var%foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape4 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var%%foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape5 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var/foo\\a/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape6 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var//foo\\a/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape7 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var/#foo\\a/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape8 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var/%foo\\a/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape9 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var^foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape10 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var^^foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape11 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var,foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape12 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var,,foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape13 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var#\\*\\?\\[\\\\}"
+prop_checkUnnecessaryParameterExpansionPatternEscape14 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var#[a\\*]}"
+prop_checkUnnecessaryParameterExpansionPatternEscape15 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var#[a\\-c\\]]}"
+prop_checkUnnecessaryParameterExpansionPatternEscape16 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var#\"foo\\a\"}"
+prop_checkUnnecessaryParameterExpansionPatternEscape17 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var/foo\\/bar/replacement}"
+prop_checkUnnecessaryParameterExpansionPatternEscape18 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var/foo/replacement\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape19 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "#!/bin/sh\necho ${var/foo\\a/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape20 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "#!/bin/sh\necho ${var^foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape21 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "#!/bin/sh\necho ${var#foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape22 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var[1]#foo\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape23 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var#foo${x}\\a}"
+prop_checkUnnecessaryParameterExpansionPatternEscape24 =
+    verifyNot checkUnnecessaryParameterExpansionPatternEscape "echo ${var/\\#foo/replacement}"
+prop_checkUnnecessaryParameterExpansionPatternEscape25 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var#foo\\/bar}"
+prop_checkUnnecessaryParameterExpansionPatternEscape26 =
+    verify checkUnnecessaryParameterExpansionPatternEscape "echo ${var[\"key\"]#foo\\a}"
+
+data ParameterPatternChar
+    = ParameterPatternChar Id String Char Bool
+    | ParameterPatternQuoted
+    | ParameterPatternUnknown
+
+data ParameterPatternState
+    = ParameterPatternNormal
+    | ParameterPatternBracket Bool
+    | ParameterPatternStateUnknown
+
+checkUnnecessaryParameterExpansionPatternEscape params token =
+    case token of
+        T_DollarBraced _ _ (T_NormalWord _ parts) ->
+            mapM_ checkEscape $ scanPattern slashIsDelimiter pattern
+          where
+            cells = concatMap toCells parts
+            modifier = dropArrayModifier $ getBracedModifier $ map cellChar cells
+            modifierCells = drop (length cells - length modifier) cells
+            (slashIsDelimiter, pattern) = getPattern modifierCells
+        _ -> return ()
+  where
+    toCells t =
+        case t of
+            T_Literal id str -> literalCells id False str
+            T_ParamSubSpecialChar id str -> literalCells id True str
+            T_DoubleQuoted {} -> [ParameterPatternQuoted]
+            T_SingleQuoted {} -> [ParameterPatternQuoted]
+            T_DollarSingleQuoted {} -> [ParameterPatternQuoted]
+            _ -> [ParameterPatternUnknown]
+
+    literalCells id special str =
+        zipWith (\before c -> ParameterPatternChar id before c special)
+            (map (sourceSpelling special . (`take` str)) [0..]) str
+
+    sourceSpelling True = id
+    sourceSpelling False = concatMap restoreEscape
+      where
+        restoreEscape c
+            | c `elem` "}\"$`'" = ['\\', c]
+            | otherwise = [c]
+
+    cellChar cell =
+        case cell of
+            ParameterPatternChar _ _ c _ -> c
+            _ -> 'x'
+
+    dropArrayModifier ('[':rest) = dropArray 1 rest
+    dropArrayModifier str = str
+    dropArray _ [] = []
+    dropArray depth (c:rest)
+        | c == '[' = dropArray (depth + 1) rest
+        | c == ']' && depth == 1 = dropArrayModifier rest
+        | c == ']' = dropArray (depth - 1) rest
+        | otherwise = dropArray depth rest
+
+    cellsStartWith :: String -> [ParameterPatternChar] -> Bool
+    cellsStartWith prefix cells =
+        isPrefixOf prefix (map cellChar cells)
+
+    isBash = shellType params == Bash
+    getPattern cells
+        | cellsStartWith "#" cells = (False, drop 1 cells)
+        | cellsStartWith "##" cells = (False, drop 2 cells)
+        | cellsStartWith "%%" cells = (False, drop 2 cells)
+        | cellsStartWith "%" cells = (False, drop 1 cells)
+        | isBash && cellsStartWith "/" cells = (True, substitutionPattern $ drop 1 cells)
+        | isBash && cellsStartWith "^" cells = (False, drop 1 cells)
+        | isBash && cellsStartWith "^^" cells = (False, drop 2 cells)
+        | isBash && cellsStartWith "," cells = (False, drop 1 cells)
+        | isBash && cellsStartWith ",," cells = (False, drop 2 cells)
+        | otherwise = (False, [])
+
+    substitutionPattern cells =
+        takePattern $ dropAnchor $ dropGlobal cells
+      where
+        dropGlobal cs
+            | cellsStartWith "/" cs = drop 1 cs
+            | otherwise = cs
+        dropAnchor cs
+            | not (cellsStartWith "/" cells) && (cellsStartWith "#" cs || cellsStartWith "%" cs) = drop 1 cs
+            | otherwise = cs
+        takePattern [] = []
+        takePattern (ParameterPatternChar _ _ '/' _:_) = []
+        takePattern (cell@(ParameterPatternChar _ _ '\\' _):next:rest) =
+            cell : next : takePattern rest
+        takePattern (cell:rest) = cell : takePattern rest
+
+    checkEscape (id, before) =
+        styleWithFix id 4001
+            "This parameter expansion pattern contains an unnecessary backslash. Remove it."
+            (fixWith [replaceWithinToken id params before "\\" ""])
+
+scanPattern slashIsDelimiter = go ParameterPatternNormal
+  where
+    go _ [] = []
+    go state (ParameterPatternQuoted:rest) = go state rest
+    go _ (ParameterPatternUnknown:rest) = go ParameterPatternStateUnknown rest
+    go state (ParameterPatternChar id before '\\' _:next:rest) =
+        case next of
+            ParameterPatternChar _ _ c _ ->
+                let result = if escapeIsNecessary slashIsDelimiter state c then [] else [(id, before)]
+                in result ++ go (escapedState state) rest
+            _ -> go state (next:rest)
+    go state (ParameterPatternChar _ _ c _:rest) = go (nextState state c) rest
+
+    escapedState ParameterPatternNormal = ParameterPatternNormal
+    escapedState (ParameterPatternBracket _) = ParameterPatternBracket True
+    escapedState ParameterPatternStateUnknown = ParameterPatternStateUnknown
+
+    nextState ParameterPatternNormal '[' = ParameterPatternBracket False
+    nextState ParameterPatternNormal _ = ParameterPatternNormal
+    nextState (ParameterPatternBracket False) c
+        | c `elem` "!^" = ParameterPatternBracket False
+        | otherwise = ParameterPatternBracket True
+    nextState (ParameterPatternBracket True) ']' = ParameterPatternNormal
+    nextState state@(ParameterPatternBracket True) _ = state
+    nextState ParameterPatternStateUnknown _ = ParameterPatternStateUnknown
+
+escapeIsNecessary slashIsDelimiter state c =
+    slashIsDelimiter && c `elem` "/#%" ||
+        case state of
+            ParameterPatternNormal -> c `elem` "*?[\\()+@!|"
+            ParameterPatternBracket firstCanClose ->
+                c `elem` "\\]-[" || not firstCanClose && c `elem` "!^"
+            ParameterPatternStateUnknown -> c `elem` "*?[\\]-()+@!|"
 
 prop_checkArrayValueUsedAsIndex1 = verifyTree checkArrayValueUsedAsIndex  "for i in ${arr[@]}; do echo ${arr[i]}; done"
 prop_checkArrayValueUsedAsIndex2 = verifyTree checkArrayValueUsedAsIndex  "for i in ${arr[@]}; do echo ${arr[$i]}; done"
