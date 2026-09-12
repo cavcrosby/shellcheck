@@ -1,0 +1,12 @@
+---
+files: |
+  (?x)^(
+    .github/sync-upstream|
+    .github/workflows/sync-upstream.yml
+  )$
+
+repos:
+  - repo: https://github.com/betterleaks/betterleaks.git
+    rev: v1.8.1
+    hooks:
+      - id: betterleaks
