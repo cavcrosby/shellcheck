@@ -64,8 +64,8 @@ if is_ge_version "${latest_upstream_version}" "${latest_origin_version}"; then
         "41898282+github-actions[bot]@users.noreply.github.com"
 
     git merge \
-        --message "Merge upstream tag '${tag}'" \
-        "$(git ls-remote "upstream" "${tag}^{}" | awk '{ print $1 }')"
+        --message "Merge upstream tag '${latest_upstream_version}'" \
+        "$(git ls-remote "upstream" "${latest_upstream_version}^{}" | awk '{ print $1 }')"
 
     git push "origin" "master"
 fi
